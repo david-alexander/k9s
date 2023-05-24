@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"strconv"
 	"time"
 
 	"github.com/derailed/k9s/internal/client"
@@ -67,11 +68,55 @@ func (s *Service) showPods(a *App, _ ui.Tabular, gvr, path string) {
 	showPodsWithLabels(a, path, svc.Spec.Selector)
 }
 
-func (s *Service) checkSvc(svc *v1.Service) error {
-	if svc.Spec.Type != "NodePort" && svc.Spec.Type != "LoadBalancer" {
-		return errors.New("You must select a reachable service")
+func (s *Service) checkSvc(svc *v1.Service, cfg config.BenchConfig) (string, string, error) {
+	port := ""
+	nodePort := ""
+
+	for _, p := range svc.Spec.Ports {
+		port = strconv.Itoa(int(p.Port))
+		nodePort = strconv.Itoa(int(p.NodePort))
+		break
 	}
-	return nil
+
+	if cfg.ServiceResolution.Mode == "ClusterIP" {
+		if len(svc.Spec.ClusterIPs) == 0 {
+			return "", "", errors.New("Using serviceResolution.mode ClusterIP but Service does not have a ClusterIP")
+		}
+		return svc.Spec.ClusterIPs[0], port, nil
+	}
+	
+	if cfg.ServiceResolution.Mode == "LoadBalancerIngress" {
+		if svc.Spec.Type != "LoadBalancer" {
+			return "", "", errors.New("Using serviceResolution.mode LoadBalancerIngress but Service is not of type LoadBalancer")
+		}
+
+		address := ""
+
+		for _, ingress := range svc.Status.LoadBalancer.Ingress {
+			if ingress.Hostname != "" {
+				address = ingress.Hostname
+				break
+			}
+	
+			if ingress.IP != "" {
+				address = ingress.IP
+				break
+			}
+		}
+
+		if address == "" {
+			return "", "", errors.New("Using serviceResolution.mode LoadBalancerIngress but Service does not have a `spec.loadBalancer.ingress`")
+		}
+
+		return address, "", nil
+	}
+
+	// default mode: "ConfiguredHost"
+	if cfg.HTTP.Host == "" {
+		return "", nodePort, fmt.Errorf("Invalid benchmark host %q", cfg.HTTP.Host)
+	}
+
+	return cfg.HTTP.Host, "", nil
 }
 
 func (s *Service) getExternalPort(svc *v1.Service) (string, error) {
@@ -121,16 +166,12 @@ func (s *Service) toggleBenchCmd(evt *tcell.EventKey) *tcell.EventKey {
 		s.App().Flash().Err(err)
 		return nil
 	}
-	if e := s.checkSvc(svc); e != nil {
-		s.App().Flash().Err(e)
-		return nil
-	}
-	port, err := s.getExternalPort(svc)
+	address, port, err := s.checkSvc(svc, cfg)
 	if err != nil {
 		s.App().Flash().Err(err)
 		return nil
 	}
-	if err := s.runBenchmark(port, cfg); err != nil {
+	if err := s.runBenchmark(address, port, cfg); err != nil {
 		s.App().Flash().Errf("Benchmark failed %v", err)
 		s.App().ClearStatus(false)
 		s.bench = nil
@@ -140,18 +181,14 @@ func (s *Service) toggleBenchCmd(evt *tcell.EventKey) *tcell.EventKey {
 }
 
 // BOZO!! Refactor used by forwards.
-func (s *Service) runBenchmark(port string, cfg config.BenchConfig) error {
+func (s *Service) runBenchmark(address string, port string, cfg config.BenchConfig) error {
 	scheme := "http"
 	if cfg.HTTP.HTTPS {
 		scheme = "https"
 	}
 
-	if cfg.HTTP.Host == "" {
-		return fmt.Errorf("Invalid benchmark host %q", cfg.HTTP.Host)
-	}
-
 	var err error
-	base := scheme + "://" + cfg.HTTP.Host + ":" + port + cfg.HTTP.Path
+	base := scheme + "://" + address + ":" + port + cfg.HTTP.Path
 	if s.bench, err = perf.NewBenchmark(base, s.App().version, cfg); err != nil {
 		return err
 	}

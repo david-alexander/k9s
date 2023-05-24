@@ -46,6 +46,15 @@ type (
 		Headers http.Header `yaml:"headers"`
 	}
 
+	// ServiceResolution represents settings for how to resolve a k8s Service to an accessible IP or hostname.
+	ServiceResolution struct {
+		// Mode can be:
+		//  - "ConfiguredHost": (default) Use the hostname or IP address configured in `HTTP.Host`. Assumes the service is reachable via that hostname or IP address.
+		//  - "ClusterIP": Access the service directly via its ClusterIP. Assumes the ClusterIP is reachable, i.e. k9s is running within the cluster or has VPN access to it.
+		//  - "LoadBalancerIngress": Access the service via its load-balancer ingress (`status.loadBalancer.ingress`). Only works for LoadBalancer services that have a load-balancer ingress; otherwise produces an error.
+		Mode  string        `yaml:"mode"`
+	}
+
 	// BenchConfig represents a service benchmark.
 	BenchConfig struct {
 		Name string
@@ -53,6 +62,7 @@ type (
 		N    int  `yaml:"requests"`
 		Auth Auth `yaml:"auth"`
 		HTTP HTTP `yaml:"http"`
+		ServiceResolution ServiceResolution `yaml:"serviceResolution"`
 	}
 )
 

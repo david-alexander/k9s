@@ -52,6 +52,18 @@ func NewBenchmark(base, version string, cfg config.BenchConfig) (*Benchmark, err
 func (b *Benchmark) init(base, version string) error {
 	var ctx context.Context
 	ctx, b.cancelFn = context.WithTimeout(context.Background(), benchTimeout)
+
+	// TODO: Handle the case where:
+	//        - `serviceResolution.mode` is "LoadBalancerIngress"
+	//        - `http.https` is true
+	//        - `host` (or `http.header.Host`) is set
+	//
+	// Currently this will fail at the SNI stage because the SNI hostname won't match the address that we've resolved for the service.
+	// Most of the time, the solution here is just to use `serviceResolution.mode` "ConfiguredHost" instead,
+	// but this won't work if the DNS doesn't yet point at our LoadBalancer IP.
+	//
+	// See https://github.com/golang/go/issues/22704#issuecomment-346537646 for a possible way to do this.
+
 	req, err := http.NewRequestWithContext(ctx, b.config.HTTP.Method, base, nil)
 	if err != nil {
 		return err
