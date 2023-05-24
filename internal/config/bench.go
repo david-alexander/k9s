@@ -40,6 +40,7 @@ type (
 		Method  string      `yaml:"method"`
 		Host    string      `yaml:"host"`
 		Path    string      `yaml:"path"`
+		HTTPS   bool        `yaml:"https"`
 		HTTP2   bool        `yaml:"http2"`
 		Body    string      `yaml:"body"`
 		Headers http.Header `yaml:"headers"`

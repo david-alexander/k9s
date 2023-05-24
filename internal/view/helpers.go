@@ -176,6 +176,11 @@ func containerID(path, co string) string {
 
 // UrlFor computes fq url for a given benchmark configuration.
 func urlFor(cfg config.BenchConfig, port string) string {
+	scheme := "http"
+	if cfg.HTTP.HTTPS {
+		scheme = "https"
+	}
+
 	host := "localhost"
 	if cfg.HTTP.Host != "" {
 		host = cfg.HTTP.Host
@@ -186,7 +191,7 @@ func urlFor(cfg config.BenchConfig, port string) string {
 		path = cfg.HTTP.Path
 	}
 
-	return "http://" + host + ":" + port + path
+	return scheme + "://" + host + ":" + port + path
 }
 
 func fqn(ns, n string) string {

@@ -94,6 +94,7 @@ func trimContainer(n string) string {
 }
 
 // UrlFor computes fq url for a given benchmark configuration.
+// TODO: Update this to support HTTPS?
 func UrlFor(host, path, port string) string {
 	if host == "" {
 		host = "localhost"

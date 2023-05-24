@@ -141,12 +141,17 @@ func (s *Service) toggleBenchCmd(evt *tcell.EventKey) *tcell.EventKey {
 
 // BOZO!! Refactor used by forwards.
 func (s *Service) runBenchmark(port string, cfg config.BenchConfig) error {
+	scheme := "http"
+	if cfg.HTTP.HTTPS {
+		scheme = "https"
+	}
+
 	if cfg.HTTP.Host == "" {
 		return fmt.Errorf("Invalid benchmark host %q", cfg.HTTP.Host)
 	}
 
 	var err error
-	base := "http://" + cfg.HTTP.Host + ":" + port + cfg.HTTP.Path
+	base := scheme + "://" + cfg.HTTP.Host + ":" + port + cfg.HTTP.Path
 	if s.bench, err = perf.NewBenchmark(base, s.App().version, cfg); err != nil {
 		return err
 	}
